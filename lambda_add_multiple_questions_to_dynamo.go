@@ -36,31 +36,34 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (map[stri
 
 	fmt.Println("Raw Event:", event)
 
-	var request Request
-	err := json.Unmarshal([]byte(event.Body), &request)
+	var requests []Request
+	err := json.Unmarshal([]byte(event.Body), &requests)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request body: %v", err)
 	}
 
-	fmt.Println("Question Name: ", request.QuestionName)
-	fmt.Println("Question Date: ", request.QuestionDate)
-	fmt.Println("Question Difficulty: ", request.QuestionDifficulty)
-	fmt.Println("Question Tags: ", request.QuestionTags)
+	successCount := 0
 
-	message := fmt.Sprintf("Question Name: %s, Question Date: %s, Question Difficulty: %s, Question Tags: %s", request.QuestionName, request.QuestionDate, request.QuestionDifficulty, request.QuestionTags)
-	
-	tagsJSON, err := json.Marshal(request.QuestionTags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal tags: %v", err)
+	for _, request := range requests {
+		fmt.Println("Question Name: ", request.QuestionName)
+		fmt.Println("Question Date: ", request.QuestionDate)
+		fmt.Println("Question Difficulty: ", request.QuestionDifficulty)
+		fmt.Println("Question Tags: ", request.QuestionTags)
+
+		tagsJSON, err := json.Marshal(request.QuestionTags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal tags: %v", err)
+		}
+
+		err = putItemToDynamoDB(request, string(tagsJSON))
+		if err != nil {
+			return nil, fmt.Errorf("failed to add item to DynamoDB: %v", err)
+		}
+
+		successCount++
 	}
 
-	err = putItemToDynamoDB(request, string(tagsJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to add item to DynamoDB: %v", err)
-	}
-
-	successMessage := "Question successfully added to DynamoDB."
-	fullMessage := fmt.Sprintf("%s %s", successMessage, message)
+	successMessage := fmt.Sprintf("%d question(s) successfully added to DynamoDB.", successCount)
 
 	headers := map[string]string{
 		"Access-Control-Allow-Origin":      "*",           
@@ -69,7 +72,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (map[stri
 	}
 
 	body, err := json.Marshal(map[string]string{
-		"message": fullMessage,
+		"message": successMessage,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal response body: %v", err)
@@ -78,7 +81,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (map[stri
 	return map[string]interface{}{
 		"statusCode": 200,
 		"headers":    headers,
-		"body": string(body),
+		"body":       string(body),
 	}, nil
 }
 

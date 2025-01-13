@@ -10,14 +10,14 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-    "github.com/aws/aws-sdk-go-v2/service/dynamodb/attributevalue"
+    "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 )
 
 type Question struct {
-    Name       string   `json:"name"`
-    Date       string   `json:"date"`
-    Difficulty string   `json:"difficulty"`
-    Tags       []string `json:"tags"`
+    Name       string   `dynamodbav:"question_name"`
+    Date       string   `dynamodbav:"question_solved_date"`
+    Difficulty string   `dynamodbav:"difficulty"`
+    Tags       []string   `json:"tags"`
 }
 
 var dynamoClient *dynamodb.Client
@@ -51,7 +51,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 	}
 
 	return events.APIGatewayProxyResponse{
-		StatusCode:	200
+		StatusCode:	200,
 		Headers:	map[string]string{
 			"Content-Type":                   "application/json",
         		"Access-Control-Allow-Origin":    "*",
@@ -64,7 +64,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 }
 
 func fetchAllQuestions(ctx context.Context) ([]Question, error) {
-	var question []Question
+	var questions []Question
 	input := &dynamodb.ScanInput{
 		TableName: aws.String(tableName),
 	}
@@ -75,14 +75,36 @@ func fetchAllQuestions(ctx context.Context) ([]Question, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan DynamoDB: %w", err)
 		}
+		
+		for _, item := range page.Items {
+			log.Printf("Raw item: %v", item)
+		}
 
-		var pageQuestions []Question
+		var pageQuestions []struct {
+			Name       string `dynamodbav:"question_name"`
+			Date       string `dynamodbav:"question_solved_date"`
+			Difficulty string `dynamodbav:"difficulty"`
+			Tags       string `dynamodbav:"tags"` // Tags as a string from DynamoDB
+		}
 		err = attributevalue.UnmarshalListOfMaps(page.Items, &pageQuestions)
 		if err != nil {
          		return nil, fmt.Errorf("failed to unmarshal DynamoDB items: %w", err)
         	}
 
-		questions = append(questions, pageQuestions...)
+		for _, q := range pageQuestions {
+			var tags []string
+			if err := json.Unmarshal([]byte(q.Tags), &tags); err != nil {
+				log.Printf("Failed to parse tags for question %s: %v", q.Name, err)
+				tags = []string{} // Default to an empty array if parsing fails
+			}
+
+			questions = append(questions, Question{
+				Name:       q.Name,
+				Date:       q.Date,
+				Difficulty: q.Difficulty,
+				Tags:       tags,
+			})
+		}
 	}
 
 	return questions, nil
@@ -91,4 +113,3 @@ func fetchAllQuestions(ctx context.Context) ([]Question, error) {
 func main() {
 	lambda.Start(Handler)
 }
-
