@@ -22,36 +22,44 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 	userID, err := auth.GetUserIDFromToken(authHeader)
 	if err != nil {
 		log.Printf("Unauthorized request: %v", err)
-		return events.APIGatewayProxyResponse{
+		response := events.APIGatewayProxyResponse{
 			StatusCode: 401,
 			Headers:    headers,
 			Body:       `{"message":"Unauthorized"}`,
-		}, nil
+		}
+		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+		return response, nil
 	}
 
 	questions, err := db.FetchQuestions(ctx, userID)
 	if err != nil {
 		log.Printf("Failed to fetch questions: %v", err)
-		return events.APIGatewayProxyResponse{
+		response := events.APIGatewayProxyResponse{
 			StatusCode: 500,
 			Headers:    headers,
 			Body:       `{"message":"Internal Server Error"}`,
-		}, nil
+		}
+		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+		return response, nil
 	}
 
 	responseBody, err := json.Marshal(questions)
 	if err != nil {
 		log.Printf("Failed to marshal response: %v", err)
-		return events.APIGatewayProxyResponse{
+		response := events.APIGatewayProxyResponse{
 			StatusCode: 500,
 			Headers:    headers,
 			Body:       `{"message":"Internal Server Error"}`,
-		}, nil
+		}
+		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+		return response, nil
 	}
 
-	return events.APIGatewayProxyResponse{
+	response := events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers:    headers,
 		Body:       string(responseBody),
-	}, nil
+	}
+	log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+	return response, nil
 }

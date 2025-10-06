@@ -1,9 +1,10 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
-
-	"github.com/golang-jwt/jwt/v4"
+	"strings"
 )
 
 func GetUserIDFromToken(authHeader string) (string, error) {
@@ -11,26 +12,37 @@ func GetUserIDFromToken(authHeader string) (string, error) {
 		return "", fmt.Errorf("no Authorization header")
 	}
 
-	tokenString := authHeader[len("Bearer "):]
+	const prefix = "Bearer "
+	if !strings.HasPrefix(authHeader, prefix) {
+		return "", fmt.Errorf("invalid Authorization header format")
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, prefix)
 
 	if tokenString == "dummy-sub-token" {
 		return "dummy-user-id", nil
 	}
 
-	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	parts := strings.Split(tokenString, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid JWT: expected 3 parts")
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", fmt.Errorf("failed to parse JWT: %v", err)
+		return "", fmt.Errorf("failed to decode JWT payload: %v", err)
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", fmt.Errorf("failed to parse claims")
+	var claims struct {
+		Sub string `json:"sub"`
+	}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return "", fmt.Errorf("failed to parse JWT claims: %v", err)
 	}
 
-	sub, ok := claims["sub"].(string)
-	if !ok {
+	if claims.Sub == "" {
 		return "", fmt.Errorf("sub claim not found")
 	}
 
-	return sub, nil
+	return claims.Sub, nil
 }
