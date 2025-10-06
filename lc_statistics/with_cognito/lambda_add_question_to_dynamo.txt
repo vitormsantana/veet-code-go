@@ -1,0 +1,139 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"encoding/json"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/events"
+	"time"
+)
+
+type Request struct {
+	QuestionName       string   `json:"name"`
+	QuestionDate       string   `json:"date"`
+	QuestionDifficulty string   `json:"difficulty"`
+	QuestionTags       []string `json:"tags"`
+	MinutesTaken       int      `json:"minutes_taken"`
+	NeededHelp         bool     `json:"needed_help"`
+}
+
+var dynamoClient  *dynamodb.Client
+const tableName = "veet_code_questions_table"
+
+func init() {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("sa-east-1"))
+	if err != nil {
+		panic(fmt.Sprintf("Unable to load AWS SDK config: %v", err))
+	}
+
+	dynamoClient = dynamodb.NewFromConfig(cfg)
+}
+
+func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (map[string]interface{}, error) {
+
+	fmt.Println("Raw Event:", event)
+
+	authHeader := event.Headers["Authorization"]
+	userID, err := getUserIDFromToken(authHeader)
+	if err != nil {
+		return nil, fmt.Errorf("unauthorized: %v", err)
+	}
+
+	var request Request
+	err = json.Unmarshal([]byte(event.Body), &request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request body: %v", err)
+	}
+
+	questionID := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	tagsJSON, err := json.Marshal(request.QuestionTags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tags: %v", err)
+	}
+
+	err = putItemToDynamoDB(userID, questionID, request, string(tagsJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to add item to DynamoDB: %v", err)
+	}
+
+	successMessage := "Question successfully added to DynamoDB."
+	fullMessage := fmt.Sprintf("%s Question Name: %s, Date: %s", successMessage, request.QuestionName, request.QuestionDate)
+
+
+	headers := map[string]string{
+		"Access-Control-Allow-Origin":      "*",           
+		"Access-Control-Allow-Methods":     "POST, OPTIONS",
+		"Access-Control-Allow-Headers":     "Content-Type, Authorization",
+	}
+
+	body, err := json.Marshal(map[string]string{
+		"message": fullMessage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response body: %v", err)
+	}
+
+	return map[string]interface{}{
+		"statusCode": 200,
+		"headers":    headers,
+		"body": string(body),
+	}, nil
+}
+
+func putItemToDynamoDB(userID, questionID string, request Request, tagsJSON string) error {
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String(tableName),
+		Item: map[string]types.AttributeValue{
+			"user_id":             &types.AttributeValueMemberS{Value: userID},
+			"question_id":         &types.AttributeValueMemberS{Value: questionID},
+			"question_name":       &types.AttributeValueMemberS{Value: request.QuestionName},
+			"question_solved_date": &types.AttributeValueMemberS{Value: request.QuestionDate},
+			"difficulty":          &types.AttributeValueMemberS{Value: request.QuestionDifficulty},
+			"tags":                &types.AttributeValueMemberS{Value: tagsJSON},
+			"minutes_taken":       &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", request.MinutesTaken)},
+			"needed_help":         &types.AttributeValueMemberBOOL{Value: request.NeededHelp},
+		},
+	}
+
+	_, err := dynamoClient.PutItem(context.TODO(), input)
+	if err != nil {
+		return fmt.Errorf("failed to put item in DynamoDB: %v", err)
+	}
+	return nil
+}
+
+func main() {
+	lambda.Start(Handler)
+}
+
+func getUserIDFromToken(authHeader string) (string, error) {
+	if authHeader == "" {
+		return "", fmt.Errorf("no Authorization header")
+	}
+
+	tokenString := authHeader[len("Bearer "):]
+
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JWT: %v", err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", fmt.Errorf("failed to parse claims")
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return "", fmt.Errorf("sub claim not found")
+	}
+
+	return sub, nil
+}

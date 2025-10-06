@@ -1,2 +1,6 @@
 *.zip
 bootstrap
+*/python/lib*
+*/dynamodb_local/*
+.vscode/
+*.zippython/vck.txt
