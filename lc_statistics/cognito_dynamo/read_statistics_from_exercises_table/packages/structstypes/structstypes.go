@@ -7,9 +7,16 @@ type Question struct {
 	Tags       []string `json:"tags"`
 }
 
+type DayStatistic struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
 type Statistics struct {
-	QuestionsCrackedPerDay        map[string]int `json:"questionsCrackedPerDay"`
-	QuestionsCrackedPerDifficulty map[string]int `json:"questionsCrackedPerDifficulty"`
-	QuestionsCrackedPerTag        map[string]int `json:"questionsCrackedPerTag"`
-	TotalQuestionsCracked         int            `json:"totalQuestionsCracked"`
+	QuestionsCrackedPerDay            map[string]int `json:"questionsCrackedPerDay"`
+	OrderedQuestionsCrackedPerDay     []DayStatistic `json:"orderedQuestionsCrackedPerDay"`
+	IncrementalQuestionsCrackedPerDay []DayStatistic `json:"incrementalQuestionsCrackedPerDay"`
+	QuestionsCrackedPerDifficulty     map[string]int `json:"questionsCrackedPerDifficulty"`
+	QuestionsCrackedPerTag            map[string]int `json:"questionsCrackedPerTag"`
+	TotalQuestionsCracked             int            `json:"totalQuestionsCracked"`
 }
