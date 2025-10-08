@@ -57,6 +57,7 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 			TagsJSON     string `dynamodbav:"tags"`
 			MinutesTaken int    `dynamodbav:"minutes_taken"`
 			NeededHelp   bool   `dynamodbav:"needed_help"`
+			Observation  string `dynamodbav:"obs"`
 		}
 		err = attributevalue.UnmarshalListOfMaps(page.Items, &pageQuestions)
 		if err != nil {
@@ -79,6 +80,7 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 				Tags:         tags,
 				MinutesTaken: q.MinutesTaken,
 				NeededHelp:   q.NeededHelp,
+				Observation:  q.Observation,
 			})
 		}
 	}
