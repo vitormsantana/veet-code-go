@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_exercises_from_dynamo/packages/structstypes"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_statistics_from_exercises_table/packages/structstypes"
 )
 
 var dynamoClient *dynamodb.Client
@@ -49,15 +49,10 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 		}
 
 		var pageQuestions []struct {
-			UserID       string `dynamodbav:"user_id"`
-			QuestionID   string `dynamodbav:"question_id"`
-			Name         string `dynamodbav:"question_name"`
-			Date         string `dynamodbav:"question_solved_date"`
-			Difficulty   string `dynamodbav:"difficulty"`
-			TagsJSON     string `dynamodbav:"tags"`
-			MinutesTaken int    `dynamodbav:"minutes_taken"`
-			NeededHelp   bool   `dynamodbav:"needed_help"`
-			Observation  string `dynamodbav:"obs"`
+			Name       string `dynamodbav:"question_name"`
+			Date       string `dynamodbav:"question_solved_date"`
+			Difficulty string `dynamodbav:"difficulty"`
+			Tags       string `dynamodbav:"tags"`
 		}
 		err = attributevalue.UnmarshalListOfMaps(page.Items, &pageQuestions)
 		if err != nil {
@@ -66,21 +61,16 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 
 		for _, q := range pageQuestions {
 			var tags []string
-			if err := json.Unmarshal([]byte(q.TagsJSON), &tags); err != nil {
+			if err := json.Unmarshal([]byte(q.Tags), &tags); err != nil {
 				log.Printf("Failed to parse tags for question %s: %v", q.Name, err)
-				tags = []string{} // Default to an empty array if parsing fails
+				tags = []string{}
 			}
 
 			questions = append(questions, structstypes.Question{
-				QuestionID:   q.QuestionID,
-				UserID:       q.UserID,
-				Name:         q.Name,
-				Date:         q.Date,
-				Difficulty:   q.Difficulty,
-				Tags:         tags,
-				MinutesTaken: q.MinutesTaken,
-				NeededHelp:   q.NeededHelp,
-				Observation:  q.Observation,
+				Name:       q.Name,
+				Date:       q.Date,
+				Difficulty: q.Difficulty,
+				Tags:       tags,
 			})
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -33,18 +34,24 @@ func PutItem(userID string, request typesandstructs.Request) error {
 		return fmt.Errorf("failed to marshal tags: %v", err)
 	}
 
+	item := map[string]types.AttributeValue{
+		"user_id":              &types.AttributeValueMemberS{Value: userID},
+		"question_id":          &types.AttributeValueMemberS{Value: questionID},
+		"question_name":        &types.AttributeValueMemberS{Value: request.QuestionName},
+		"question_solved_date": &types.AttributeValueMemberS{Value: request.QuestionDate},
+		"difficulty":           &types.AttributeValueMemberS{Value: request.QuestionDifficulty},
+		"tags":                 &types.AttributeValueMemberS{Value: string(tagsJSON)},
+		"minutes_taken":        &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", request.MinutesTaken)},
+		"needed_help":          &types.AttributeValueMemberBOOL{Value: request.NeededHelp},
+	}
+
+	if obs := strings.TrimSpace(request.Observation); obs != "" {
+		item["obs"] = &types.AttributeValueMemberS{Value: obs}
+	}
+
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(TableName),
-		Item: map[string]types.AttributeValue{
-			"user_id":              &types.AttributeValueMemberS{Value: userID},
-			"question_id":          &types.AttributeValueMemberS{Value: questionID},
-			"question_name":        &types.AttributeValueMemberS{Value: request.QuestionName},
-			"question_solved_date": &types.AttributeValueMemberS{Value: request.QuestionDate},
-			"difficulty":           &types.AttributeValueMemberS{Value: request.QuestionDifficulty},
-			"tags":                 &types.AttributeValueMemberS{Value: string(tagsJSON)},
-			"minutes_taken":        &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", request.MinutesTaken)},
-			"needed_help":          &types.AttributeValueMemberBOOL{Value: request.NeededHelp},
-		},
+		Item:      item,
 	}
 
 	_, err = Client.PutItem(context.TODO(), input)
