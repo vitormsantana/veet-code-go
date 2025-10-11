@@ -88,7 +88,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 			Body:       `{"message":"invalid request body"}`,
 		}, nil
 	}
-	logger.Infow("Parsed profile payload", "userID", userID, "target_companies", request.TargetCompanies, "desired_role", request.DesiredRole, "years_experience", request.YearsOfExperience)
+	logger.Infow("Parsed profile payload", "userID", userID, "target_company", request.TargetCompany, "desired_role", request.DesiredRole, "years_experience", request.YearsOfExperience)
 
 	request.UserID = userID
 

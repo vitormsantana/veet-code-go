@@ -9,7 +9,7 @@ import (
 
 func CalculateProfileScore(profile *typesandstructs.UserProfile) float64 {
 	fields := []string{
-		profile.TargetCompanies,
+		profile.TargetCompany,
 		profile.DesiredRole,
 		profile.DesiredLevel,
 		profile.MainStack,

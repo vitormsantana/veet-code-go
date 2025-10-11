@@ -53,7 +53,7 @@ func PutUserProfile(profile typesandstructs.UserProfile) error {
 
 	item := map[string]types.AttributeValue{
 		"user_id":                  &types.AttributeValueMemberS{Value: profile.UserID},
-		"target_companies":         &types.AttributeValueMemberS{Value: profile.TargetCompanies},
+		"target_company":           &types.AttributeValueMemberS{Value: profile.TargetCompany},
 		"desired_role":             &types.AttributeValueMemberS{Value: profile.DesiredRole},
 		"desired_level":            &types.AttributeValueMemberS{Value: profile.DesiredLevel},
 		"years_of_experience":      &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", profile.YearsOfExperience)},

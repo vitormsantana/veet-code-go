@@ -2,7 +2,7 @@ package typesandstructs
 
 type UserProfile struct {
 	UserID                 string  `json:"user_id"`
-	TargetCompanies        string  `json:"target_companies"`
+	TargetCompany          string  `json:"target_company"`
 	DesiredRole            string  `json:"desired_role"`
 	DesiredLevel           string  `json:"desired_level"`
 	YearsOfExperience      int     `json:"years_of_experience"`
