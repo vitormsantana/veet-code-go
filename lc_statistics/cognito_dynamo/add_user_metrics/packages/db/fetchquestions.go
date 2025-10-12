@@ -10,20 +10,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	structstypes "github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics/packages/typesandstructs"
 )
 
 func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question, error) {
 	var questions []structstypes.Question
 
+	if Client == nil {
+		return nil, fmt.Errorf("dynamodb client not initialized")
+	}
+
 	input := &dynamodb.QueryInput{
-		TableName:              aws.String(tableName),
+		TableName:              aws.String(questionTableName),
 		KeyConditionExpression: aws.String("user_id = :uid"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":uid": &types.AttributeValueMemberS{Value: userID},
 		},
 	}
 
-	paginator := dynamodb.NewQueryPaginator(dynamoClient, input)
+	paginator := dynamodb.NewQueryPaginator(Client, input)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -61,10 +66,9 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 			questions = append(questions, structstypes.Question{
 				QuestionID:      q.QuestionID,
 				UserID:          q.UserID,
-				Name:            q.Name,
-				Date:            q.Date,
-				Difficulty:      q.Difficulty,
-				Tags:            tags,
+				QuestionName:    q.Name,
+				QuestionDate:    q.Date,
+				QuestionTags:    tags,
 				MinutesTaken:    q.MinutesTaken,
 				NeededHelp:      q.NeededHelp,
 				Observation:     q.Observation,

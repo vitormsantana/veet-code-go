@@ -1,22 +1,4 @@
-package typesandstructs
-
-type Request struct {
-	MetricsDate     string `json:"date"`
-	ShortWindowDays int    `json:"short_window_days"`
-	LongWindowDays  int    `json:"long_window_days"`
-}
-
-type Question struct {
-	QuestionID      string   `json:"question_id"`
-	UserID          string   `json:"user_id"`
-	QuestionName    string   `json:"name"`
-	QuestionDate    string   `json:"date"`
-	QuestionTags    []string `json:"tags"`
-	MinutesTaken    int      `json:"minutes_taken"`
-	NeededHelp      bool     `json:"needed_help"`
-	Observation     string   `json:"obs"`
-	CrackedExercise bool     `json:"cracked_exercise"`
-}
+package structstypes
 
 type UserMetrics struct {
 	UserID                 string             `json:"user_id" dynamodbav:"user_id"`

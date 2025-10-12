@@ -1,15 +1,34 @@
 package db
 
 import (
+	"context"
+	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	structstypes "github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics/packages/typesandstructs"
 )
 
 var Client *dynamodb.Client
 
-const TableName = "hammocker_user_metrics_table"
+const (
+	metricsTableName  = "hammocker_user_metrics_table"
+	questionTableName = "veet_code_questions_table"
+)
+
+func Init() error {
+	if Client != nil {
+		return nil
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("sa-east-1"))
+	if err != nil {
+		return fmt.Errorf("unable to load AWS SDK config: %w", err)
+	}
+	Client = dynamodb.NewFromConfig(cfg)
+	return nil
+}
 
 func calculate_avg_minutes_per_tag(questions []structstypes.Question) map[string]float64 {
 	if len(questions) == 0 {

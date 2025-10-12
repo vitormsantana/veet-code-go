@@ -1,6 +1,6 @@
-module github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics
+module github.com/vitormsantana/veet-code-go/cognito_dynamo/read_exercises_from_dynamo
 
-go 1.22.2
+go 1.23.4
 
 require (
 	github.com/aws/aws-lambda-go v1.49.0

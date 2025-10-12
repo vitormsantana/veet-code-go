@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics/packages/handler"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_exercises_from_dynamo/packages/handler"
 )
 
 func main() {
