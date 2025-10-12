@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/auth"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/buildprompt"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/db"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/generatestatistics"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/structstypes"
@@ -28,7 +29,7 @@ var (
 )
 
 const (
-	defaultGoal              = "Study for AMAZON / GOOGLE interviews."
+	defaultGoal              = "Be better in coding interviews."
 	defaultOpenAIModel       = "gpt-4o-mini"
 	defaultOpenAITokens      = 512
 	defaultTimeoutSeconds    = 8
@@ -97,6 +98,18 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 
 	goal := extractGoal(event)
 
+	profile, err := db.FetchUserProfile(ctx, userID)
+	if err != nil {
+		log.Printf("Failed to fetch profile: %v", err)
+		response := events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Headers:    headers,
+			Body:       `{"message":"Internal Server Error"}`,
+		}
+		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+		return response, nil
+	}
+
 	questions, err := db.FetchQuestions(ctx, userID)
 	if err != nil {
 		log.Printf("Failed to fetch questions: %v", err)
@@ -112,7 +125,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 	stats := generatestatistics.GenerateStatistics(questions)
 	questionNames := uniqueQuestionNames(questions)
 
-	prompt, err := buildPrompt(goal, questionNames, stats)
+	prompt, err := buildprompt.BuildPrompt(goal, questionNames, stats, profile)
 	if err != nil {
 		log.Printf("Failed to build prompt: %v", err)
 		response := events.APIGatewayProxyResponse{
@@ -212,56 +225,6 @@ func uniqueQuestionNames(questions []structstypes.Question) []string {
 		result = append(result, name)
 	}
 	return result
-}
-
-func buildPrompt(goal string, questionNames []string, stats structstypes.Statistics) (string, error) {
-	type promptStats struct {
-		QuestionsCrackedPerDay            map[string]int              `json:"questionsCrackedPerDay"`
-		QuestionsCrackedPerDifficulty     map[string]int              `json:"questionsCrackedPerDifficulty"`
-		QuestionsCrackedPerTag            map[string]int              `json:"questionsCrackedPerTag"`
-		IncrementalQuestionsCrackedPerDay []structstypes.DayStatistic `json:"incrementalQuestionsCrackedPerDay"`
-	}
-
-	statsPayload := promptStats{
-		QuestionsCrackedPerDay:            stats.QuestionsCrackedPerDay,
-		QuestionsCrackedPerDifficulty:     stats.QuestionsCrackedPerDifficulty,
-		QuestionsCrackedPerTag:            stats.QuestionsCrackedPerTag,
-		IncrementalQuestionsCrackedPerDay: stats.IncrementalQuestionsCrackedPerDay,
-	}
-
-	statsJSON, err := json.Marshal(statsPayload)
-	if err != nil {
-		return "", err
-	}
-
-	namesJSON, err := json.Marshal(questionNames)
-	if err != nil {
-		return "", err
-	}
-
-	prompt := fmt.Sprintf(`User's goal: %s.
-Data: %s
-Please suggest 3 questions (that doesnt appear in questions names I just passed you) in the following format:
-
-### Suggested Questions
-1. <Category Name>
-**Question**: <The question>
-**Reason**: <The reason why this question was recommended>
-2. <Category Name>
-**Question**: <The question>
-**Reason**: <The reason why this question was recommended>
-3. <Category Name>
-**Question**: <The question>
-**Reason**: <The reason why this question was recommended>
-
-(main topics: 'Arrays', 'Backtracking', 'String', 'Binary Search', 'Hash Tables', 'Linked Lists', 'Two Pointers', 'Sliding Window',
-'Stacks', 'Queues', 'Heaps', 'Recursion' , 'Tree', 'BST', 'Binary Tree', 'BFS', 'DFS', 'Sets', 'Sort',
-'Dynamic Programming', 'Memoization','Graph', 'Math', 'Greedy')
-
-Is important that i havent done those questions in the past, or recently.
-Questions already solved: %s`, goal, string(statsJSON), string(namesJSON))
-
-	return prompt, nil
 }
 
 func getAuthorizationHeader(headers map[string]string) string {

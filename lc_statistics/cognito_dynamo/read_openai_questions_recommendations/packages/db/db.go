@@ -83,3 +83,29 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 
 	return questions, nil
 }
+func FetchUserProfile(ctx context.Context, userID string) (*structstypes.UserProfile, error) {
+	const profileTableName = "hammocker_user_profiles_table"
+
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(profileTableName),
+		Key: map[string]types.AttributeValue{
+			"user_id": &types.AttributeValueMemberS{Value: userID},
+		},
+	}
+
+	result, err := dynamoClient.GetItem(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user profile from DynamoDB: %w", err)
+	}
+
+	if result.Item == nil {
+		return nil, fmt.Errorf("user profile not found for user_id: %s", userID)
+	}
+
+	var profile structstypes.UserProfile
+	if err := attributevalue.UnmarshalMap(result.Item, &profile); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal user profile: %w", err)
+	}
+
+	return &profile, nil
+}
