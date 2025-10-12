@@ -43,6 +43,7 @@ type UserProfile struct {
 }
 
 type UserMetrics struct {
+	MetricID                      string             `json:"metric_id" dynamodbav:"metric_id"`
 	UserID                        string             `json:"user_id" dynamodbav:"user_id"`
 	Date                          string             `json:"date" dynamodbav:"date"`
 	ShortWindowDays               int                `json:"short_window_days" dynamodbav:"short_window_days"`
@@ -61,4 +62,40 @@ type UserMetrics struct {
 	LastActivityDaysAgo           int                `json:"last_activity_days_ago" dynamodbav:"last_activity_days_ago"`
 	TotalQuestionsAnalyzed        int                `json:"total_questions_analyzed" dynamodbav:"total_questions_analyzed"`
 	CalculatedAtUTC               string             `json:"calculated_at_utc" dynamodbav:"calculated_at_utc"`
+}
+
+type RecommendationItem struct {
+	Category string `json:"category" dynamodbav:"category"`
+	Question string `json:"question" dynamodbav:"question"`
+	Reason   string `json:"reason" dynamodbav:"reason"`
+}
+
+type StructuredRecommendation struct {
+	Intro           string               `json:"intro" dynamodbav:"intro"`
+	Recommendations []RecommendationItem `json:"recommendations" dynamodbav:"recommendations"`
+}
+
+type RecommendationRecord struct {
+	RecommendationID         string                   `json:"recommendation_id" dynamodbav:"recommendation_id"`
+	UserID                   string                   `json:"user_id" dynamodbav:"user_id"`
+	GeneratedAtUTC           string                   `json:"generated_at_utc" dynamodbav:"generated_at_utc"`
+	CreatedAtUTC             string                   `json:"created_at_utc" dynamodbav:"created_at_utc"`
+	Goal                     string                   `json:"goal" dynamodbav:"goal"`
+	PromptUsed               string                   `json:"prompt_used" dynamodbav:"prompt_used"`
+	ModelUsed                string                   `json:"model_used" dynamodbav:"model_used"`
+	TextRecommendation       string                   `json:"text_recommendation" dynamodbav:"text_recommendation"`
+	StructuredRecommendation StructuredRecommendation `json:"structured_recommendation" dynamodbav:"structured_recommendation"`
+	Metadata                 RecommendationMetadata   `json:"metadata" dynamodbav:"metadata"`
+	MetricsID                string                   `json:"metric_id,omitempty" dynamodbav:"metric_id,omitempty"`
+	PreviouslySolved         []string                 `json:"previously_solved" dynamodbav:"previously_solved"`
+	ProfileSnapshot          *UserProfile             `json:"user_profile_snapshot,omitempty" dynamodbav:"user_profile_snapshot,omitempty"`
+	FeedbackStatus           string                   `json:"feedback_status" dynamodbav:"feedback_status"`
+}
+
+type RecommendationMetadata struct {
+	FocusTags       []string `json:"focus_tags" dynamodbav:"focus_tags"`
+	ConfidenceLevel string   `json:"confidence_level" dynamodbav:"confidence_level"`
+	Tone            string   `json:"tone" dynamodbav:"tone"`
+	DifficultyBand  []string `json:"difficulty_band" dynamodbav:"difficulty_band"`
+	UserStatus      string   `json:"user_status" dynamodbav:"user_status"`
 }

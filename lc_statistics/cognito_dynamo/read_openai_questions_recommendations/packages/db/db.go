@@ -5,21 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/google/uuid"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/structstypes"
 )
 
 var dynamoClient *dynamodb.Client
 
 const (
-	questionsTableName = "veet_code_questions_table"
-	metricsTableName   = "hammocker_user_metrics_table"
-	profileTableName   = "hammocker_user_profiles_table"
+	questionsTableName       = "veet_code_questions_table"
+	metricsTableName         = "hammocker_user_metrics_table"
+	profileTableName         = "hammocker_user_profiles_table"
+	recommendationsTableName = "hammocker_recommendations_table"
 )
 
 func init() {
@@ -138,4 +141,71 @@ func FetchLatestMetrics(ctx context.Context, userID string) (*structstypes.UserM
 	}
 
 	return &metrics, nil
+}
+
+func FetchMetricsHistory(ctx context.Context, userID string) ([]structstypes.UserMetrics, error) {
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(metricsTableName),
+		KeyConditionExpression: aws.String("user_id = :uid"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid": &types.AttributeValueMemberS{Value: userID},
+		},
+		ScanIndexForward: aws.Bool(false),
+	}
+
+	paginator := dynamodb.NewQueryPaginator(dynamoClient, input)
+	var history []structstypes.UserMetrics
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query user metrics history: %w", err)
+		}
+
+		var pageMetrics []structstypes.UserMetrics
+		if err := attributevalue.UnmarshalListOfMaps(page.Items, &pageMetrics); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal user metrics history: %w", err)
+		}
+
+		history = append(history, pageMetrics...)
+	}
+
+	return history, nil
+}
+
+func SaveRecommendation(ctx context.Context, rec *structstypes.RecommendationRecord) error {
+	if rec == nil {
+		return fmt.Errorf("recommendation record is nil")
+	}
+
+	if rec.RecommendationID == "" {
+		rec.RecommendationID = uuid.NewString()
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if rec.GeneratedAtUTC == "" {
+		rec.GeneratedAtUTC = now
+	}
+	if rec.CreatedAtUTC == "" {
+		rec.CreatedAtUTC = now
+	}
+	if rec.FeedbackStatus == "" {
+		rec.FeedbackStatus = "pending"
+	}
+
+	item, err := attributevalue.MarshalMap(rec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recommendation record: %w", err)
+	}
+
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String(recommendationsTableName),
+		Item:      item,
+	}
+
+	if _, err := dynamoClient.PutItem(ctx, input); err != nil {
+		return fmt.Errorf("failed to persist recommendation: %w", err)
+	}
+
+	return nil
 }
