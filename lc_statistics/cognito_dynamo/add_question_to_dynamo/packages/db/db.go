@@ -43,6 +43,7 @@ func PutItem(userID string, request typesandstructs.Request) error {
 		"tags":                 &types.AttributeValueMemberS{Value: string(tagsJSON)},
 		"minutes_taken":        &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", request.MinutesTaken)},
 		"needed_help":          &types.AttributeValueMemberBOOL{Value: request.NeededHelp},
+		"cracked_exercise":     &types.AttributeValueMemberBOOL{Value: request.CrackedExercise},
 	}
 
 	if obs := strings.TrimSpace(request.Observation); obs != "" {

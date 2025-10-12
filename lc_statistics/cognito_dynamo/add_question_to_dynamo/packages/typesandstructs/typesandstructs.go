@@ -13,6 +13,7 @@ type Request struct {
 	MinutesTaken       int      `json:"minutes_taken"`
 	NeededHelp         bool     `json:"needed_help"`
 	Observation        string   `json:"obs"`
+	CrackedExercise    bool     `json:"cracked_exercise"`
 }
 
 func (r *Request) UnmarshalJSON(data []byte) error {

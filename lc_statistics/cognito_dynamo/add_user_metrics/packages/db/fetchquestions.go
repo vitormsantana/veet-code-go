@@ -7,24 +7,10 @@ import (
 	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_exercises_from_dynamo/packages/structstypes"
 )
-
-var dynamoClient *dynamodb.Client
-
-const tableName = "veet_code_questions_table"
-
-func init() {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("sa-east-1"))
-	if err != nil {
-		log.Fatalf("Unable to load AWS SDK config: %v", err)
-	}
-	dynamoClient = dynamodb.NewFromConfig(cfg)
-}
 
 func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question, error) {
 	var questions []structstypes.Question
