@@ -1,13 +1,11 @@
 package typesandstructs
 
-// Request represents a Lambda input request for metric computation.
 type Request struct {
 	MetricsDate     string `json:"date"`
 	ShortWindowDays int    `json:"short_window_days"`
 	LongWindowDays  int    `json:"long_window_days"`
 }
 
-// Question represents a solved or attempted LeetCode-style exercise.
 type Question struct {
 	QuestionID      string   `json:"question_id"`
 	UserID          string   `json:"user_id"`
@@ -20,8 +18,8 @@ type Question struct {
 	CrackedExercise bool     `json:"cracked_exercise"`
 }
 
-// UserMetrics stores analytics aggregated over user performance.
 type UserMetrics struct {
+	MetricID                      string             `json:"metric_id" dynamodbav:"metric_id"`
 	UserID                        string             `json:"user_id" dynamodbav:"user_id"`
 	Date                          string             `json:"date" dynamodbav:"date"`
 	ShortWindowDays               int                `json:"short_window_days" dynamodbav:"short_window_days"`
@@ -42,7 +40,6 @@ type UserMetrics struct {
 	CalculatedAtUTC               string             `json:"calculated_at_utc" dynamodbav:"calculated_at_utc"`
 }
 
-// WindowStats is an internal structure for computing moving-window success/failure rates.
 type WindowStats struct {
 	Days                    int
 	TotalConsidered         int
@@ -58,7 +55,6 @@ type WindowStats struct {
 	ParseErrorQuestionNotes []string
 }
 
-// SuccessRate returns the ratio of solved exercises to total attempts.
 func (ws WindowStats) SuccessRate() float64 {
 	if ws.TotalConsidered == 0 {
 		return 0
@@ -66,7 +62,6 @@ func (ws WindowStats) SuccessRate() float64 {
 	return float64(ws.SolvedCount) / float64(ws.TotalConsidered)
 }
 
-// FailureRate returns the ratio of failed exercises to total attempts.
 func (ws WindowStats) FailureRate() float64 {
 	if ws.TotalConsidered == 0 {
 		return 0

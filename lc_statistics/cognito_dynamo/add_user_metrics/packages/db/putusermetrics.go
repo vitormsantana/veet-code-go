@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/google/uuid"
 	structstypes "github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics/packages/typesandstructs"
 )
 
@@ -38,6 +39,7 @@ func PutUserMetrics(ctx context.Context, userID string, req structstypes.Request
 	logWindowStats(longWindowStats, "long_window")
 
 	metrics := &structstypes.UserMetrics{
+		MetricID:                      uuid.NewString(),
 		UserID:                        userID,
 		Date:                          metricsDate,
 		ShortWindowDays:               shortWindow,

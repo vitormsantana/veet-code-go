@@ -8,6 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.31.12
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.14
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.51.0
+	github.com/google/uuid v1.6.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -25,5 +27,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.6 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 )
