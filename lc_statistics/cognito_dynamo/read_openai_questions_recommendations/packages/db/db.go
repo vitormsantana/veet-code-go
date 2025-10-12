@@ -16,7 +16,11 @@ import (
 
 var dynamoClient *dynamodb.Client
 
-const tableName = "veet_code_questions_table"
+const (
+	questionsTableName = "veet_code_questions_table"
+	metricsTableName   = "hammocker_user_metrics_table"
+	profileTableName   = "hammocker_user_profiles_table"
+)
 
 func init() {
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("sa-east-1"))
@@ -30,7 +34,7 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 	var questions []structstypes.Question
 
 	input := &dynamodb.QueryInput{
-		TableName:              aws.String(tableName),
+		TableName:              aws.String(questionsTableName),
 		KeyConditionExpression: aws.String("user_id = :uid"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":uid": &types.AttributeValueMemberS{Value: userID},
@@ -84,8 +88,6 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 	return questions, nil
 }
 func FetchUserProfile(ctx context.Context, userID string) (*structstypes.UserProfile, error) {
-	const profileTableName = "hammocker_user_profiles_table"
-
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(profileTableName),
 		Key: map[string]types.AttributeValue{
@@ -108,4 +110,32 @@ func FetchUserProfile(ctx context.Context, userID string) (*structstypes.UserPro
 	}
 
 	return &profile, nil
+}
+
+func FetchLatestMetrics(ctx context.Context, userID string) (*structstypes.UserMetrics, error) {
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(metricsTableName),
+		KeyConditionExpression: aws.String("user_id = :uid"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid": &types.AttributeValueMemberS{Value: userID},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(1),
+	}
+
+	result, err := dynamoClient.Query(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user metrics: %w", err)
+	}
+
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+
+	var metrics structstypes.UserMetrics
+	if err := attributevalue.UnmarshalMap(result.Items[0], &metrics); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal user metrics: %w", err)
+	}
+
+	return &metrics, nil
 }

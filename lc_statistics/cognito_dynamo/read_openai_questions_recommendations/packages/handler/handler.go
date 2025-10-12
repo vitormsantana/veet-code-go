@@ -125,7 +125,19 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 	stats := generatestatistics.GenerateStatistics(questions)
 	questionNames := uniqueQuestionNames(questions)
 
-	prompt, err := buildprompt.BuildPrompt(goal, questionNames, stats, profile)
+	metrics, err := db.FetchLatestMetrics(ctx, userID)
+	if err != nil {
+		log.Printf("Failed to fetch user metrics: %v", err)
+		response := events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Headers:    headers,
+			Body:       `{"message":"Internal Server Error"}`,
+		}
+		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
+		return response, nil
+	}
+
+	prompt, err := buildprompt.BuildPrompt(goal, questionNames, stats, profile, metrics)
 	if err != nil {
 		log.Printf("Failed to build prompt: %v", err)
 		response := events.APIGatewayProxyResponse{

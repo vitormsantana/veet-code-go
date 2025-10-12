@@ -7,7 +7,7 @@ import (
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/structstypes"
 )
 
-func BuildPrompt(goal string, questionNames []string, stats structstypes.Statistics, profile *structstypes.UserProfile) (string, error) {
+func BuildPrompt(goal string, questionNames []string, stats structstypes.Statistics, profile *structstypes.UserProfile, metrics *structstypes.UserMetrics) (string, error) {
 	type promptStats struct {
 		QuestionsCrackedPerDay            map[string]int              `json:"questionsCrackedPerDay"`
 		QuestionsCrackedPerDifficulty     map[string]int              `json:"questionsCrackedPerDifficulty"`
@@ -36,44 +36,82 @@ func BuildPrompt(goal string, questionNames []string, stats structstypes.Statist
 	if err != nil {
 		return "", err
 	}
-	prompt := fmt.Sprintf(`User's goal: "%s".
+
+	var metricsJSON []byte
+	if metrics != nil {
+		metricsJSON, err = json.Marshal(metrics)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		metricsJSON = []byte("null")
+	}
+
+	prompt := fmt.Sprintf(`
+User's goal: "%s".
 User's profile (consider this context): %s
-User's historical data: %s
+User's exercise performance metrics: %s
+User's historical stats (per day, difficulty, tag): %s
 
-You are an AI assistant that helps people prepare for coding interviews.
-Write a short and friendly **personalized introduction paragraph (2–3 lines)** before listing the recommendations.
-This paragraph should:
-- Reference the user’s experience level and pace inferred from profile and stats.
-- Encourage them by summarizing what they’re doing well and what they can improve.
-- Use a conversational but professional tone (e.g. “You’ve been making steady progress…”).
+You are an AI interview preparation coach.
+Your job is to analyze the user's behavior, pace, and consistency to create an adaptive learning plan.
 
-Then, list **3 new recommended questions** (that do not appear in the previously solved list) using the format below:
+### Your Output
+1. **Start with a short, friendly, 2–3 line paragraph ("Progress Summary")**
+   - Reflect on the user's recent performance and pace using the metrics.
+   - Mention improvement or slowdown trends (e.g., rising average times, higher success rates, lower consistency).
+   - Encourage them in a natural, motivational tone (never robotic).
+
+   **Use metrics intelligently:**
+   - "avg_minutes_per_tag" → comment on their pacing speed ("you're solving faster each week", "try to slow down for accuracy").
+   - "help_rate_per_tag" → mention independence or reliance on help.
+   - "solved_per_tag" / "failed_per_tag" → identify strong vs weak topics.
+   - "avg_solved_last_short_window" / "avg_failed_last_short_window" → show short-term trend.
+   - "consistency_rate" → highlight engagement or inactivity.
+   - "last_activity_days_ago" → welcome them back if they paused.
+   - "total_questions_analyzed" → reference their journey so far.
+   - Be empathetic and positive, like a mentor giving encouragement.
+
+2. **Then list 3 personalized next questions**, in this structure:
 
 ### Personalized Recommendations
 
-**Intro (2–3 lines)**: <your motivational summary here>
+**Progress Summary (2–3 lines)**: <motivational paragraph>
 
 **Suggested Questions**
 1. <Category Name>
 **Question**: <Exact question title>
-**Reason**: <Why this question fits the user’s goals and experience>
+**Reason**: <Why it fits their current goals and focus>
+
 2. <Category Name>
 **Question**: <Exact question title>
-**Reason**: <Why this question fits the user’s goals and experience>
+**Reason**: <Why it matches their weak areas or pacing>
+
 3. <Category Name>
 **Question**: <Exact question title>
-**Reason**: <Why this question fits the user’s goals and experience>
+**Reason**: <Why it helps them consolidate recent learning>
 
-Focus on interview relevance and progression difficulty.
-Avoid recommending questions already solved recently.
+### Guidance for generation:
+- Avoid repeating any question in the solved list.
+- Prioritize topics with high failure or help rates.
+- Reinforce tags where average minutes are improving (indicates growing mastery).
+- Adapt difficulty: for beginners, focus on Arrays/Strings/Hash Tables;
+  for intermediates, mix in recursion, DP, or trees.
+- Use an inspiring, teacher-like tone.
+- Always mention a reason why each question matters for interviews.
+
 Previously solved list: %s
 
 Main topics reference:
 'Arrays', 'Backtracking', 'String', 'Binary Search', 'Hash Tables', 'Linked Lists',
 'Two Pointers', 'Sliding Window', 'Stacks', 'Queues', 'Heaps', 'Recursion',
-'Tree', 'BST', 'Binary Tree', 'BFS', 'DFS', 'Sets', 'Sort', 'Dynamic Programming',
-'Memoization', 'Graph', 'Math', 'Greedy'.`,
-		goal, string(profileJSON), string(statsJSON), string(namesJSON),
+'Tree', 'BST', 'Binary Tree', 'BFS', 'DFS', 'Sets', 'Sort',
+'Dynamic Programming', 'Memoization', 'Graph', 'Math', 'Greedy'.`,
+		goal,
+		string(profileJSON),
+		string(metricsJSON),
+		string(statsJSON),
+		string(namesJSON),
 	)
 
 	return prompt, nil

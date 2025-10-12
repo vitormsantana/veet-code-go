@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -62,7 +61,6 @@ func calculate_avg_minutes_per_tag(questions []structstypes.Question) map[string
 		if q.MinutesTaken <= 0 || len(q.QuestionTags) == 0 {
 			continue
 		}
-
 		for _, tag := range q.QuestionTags {
 			tagTotals[tag] += float64(q.MinutesTaken)
 			tagCounts[tag]++
@@ -71,12 +69,10 @@ func calculate_avg_minutes_per_tag(questions []structstypes.Question) map[string
 
 	avgMinutes := make(map[string]float64)
 	for tag, total := range tagTotals {
-		count := tagCounts[tag]
-		if count > 0 {
-			avgMinutes[tag] = total / float64(count)
+		if tagCounts[tag] > 0 {
+			avgMinutes[tag] = total / float64(tagCounts[tag])
 		}
 	}
-
 	return avgMinutes
 }
 
@@ -103,7 +99,6 @@ func calculate_help_rate_per_tag(questions []structstypes.Question) map[string]f
 			helpRatePerTag[tag] = float64(totalHelpsPerTag[tag]) / float64(total)
 		}
 	}
-
 	return helpRatePerTag
 }
 
@@ -144,165 +139,76 @@ func parseQuestionDate(dateStr string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse date %q: %w", dateStr, lastErr)
 }
 
-func calculate_avg_solved_last_days(questions []structstypes.Question, days int) float64 {
+func computeWindowStats(questions []structstypes.Question, days int) structstypes.WindowStats {
+	stats := structstypes.WindowStats{Days: days}
 	if len(questions) == 0 || days <= 0 {
-		if logger != nil {
-			logger.Info("avg solved last days skipped",
-				zap.Int("total_questions", len(questions)),
-				zap.Int("days", days))
-		}
-		return 0
+		return stats
 	}
 
 	now := time.Now().UTC()
 	cutoff := now.AddDate(0, 0, -days)
-	count := 0
-	considered := 0
-	var (
-		consideredIDs            []string
-		consideredDetails        []string
-		solvedIDs                []string
-		notSolvedIDs             []string
-		outsideWindowIDs         []string
-		outsideWindowDetails     []string
-		parseErrorQuestionIDs    []string
-		parseErrorQuestionDetail []string
-	)
 
 	for _, q := range questions {
 		parsed, err := parseQuestionDate(q.QuestionDate)
 		if err != nil {
-			parseErrorQuestionIDs = append(parseErrorQuestionIDs, q.QuestionID)
-			parseErrorQuestionDetail = append(parseErrorQuestionDetail, fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
+			stats.ParseErrorQuestionIDs = append(stats.ParseErrorQuestionIDs, q.QuestionID)
+			stats.ParseErrorQuestionNotes = append(stats.ParseErrorQuestionNotes, fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
 			if logger != nil {
-				logger.Warn("failed to parse question date for avg solved calculation",
+				logger.Warn("failed to parse question date for window stats",
 					zap.String("question_id", q.QuestionID),
 					zap.String("question_date", q.QuestionDate),
+					zap.Int("window_days", days),
 					zap.Error(err),
 				)
 			}
 			continue
 		}
+
 		if parsed.After(cutoff) {
-			considered++
-			consideredIDs = append(consideredIDs, q.QuestionID)
-			consideredDetails = append(consideredDetails, fmt.Sprintf("%s:%s:%t", q.QuestionID, q.QuestionDate, q.CrackedExercise))
+			stats.TotalConsidered++
+			stats.ConsideredIDs = append(stats.ConsideredIDs, q.QuestionID)
+			stats.ConsideredDetails = append(stats.ConsideredDetails,
+				fmt.Sprintf("%s:%s:%t", q.QuestionID, q.QuestionDate, q.CrackedExercise))
 			if q.CrackedExercise {
-				count++
-				solvedIDs = append(solvedIDs, q.QuestionID)
+				stats.SolvedCount++
+				stats.SolvedIDs = append(stats.SolvedIDs, q.QuestionID)
 			} else {
-				notSolvedIDs = append(notSolvedIDs, q.QuestionID)
+				stats.FailedCount++
+				stats.FailedIDs = append(stats.FailedIDs, q.QuestionID)
 			}
 		} else {
-			outsideWindowIDs = append(outsideWindowIDs, q.QuestionID)
-			outsideWindowDetails = append(outsideWindowDetails, fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
+			stats.OutsideWindowIDs = append(stats.OutsideWindowIDs, q.QuestionID)
+			stats.OutsideWindowDetails = append(stats.OutsideWindowDetails,
+				fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
 		}
 	}
 
-	avg := float64(count) / float64(days)
-	if logger != nil {
-		logger.Info("calculated avg solved last days",
-			zap.Int("days", days),
-			zap.Float64("average", avg),
-			zap.Int("solved_count", count),
-			zap.Int("considered_questions", considered),
-			zap.Time("cutoff", cutoff),
-			zap.Strings("considered_question_ids", consideredIDs),
-			zap.Strings("considered_details", consideredDetails),
-			zap.Strings("solved_question_ids", solvedIDs),
-			zap.Strings("not_solved_question_ids", notSolvedIDs),
-			zap.Strings("outside_window_ids", outsideWindowIDs),
-			zap.Strings("outside_window_details", outsideWindowDetails),
-			zap.Strings("parse_error_question_ids", parseErrorQuestionIDs),
-			zap.Strings("parse_error_question_details", parseErrorQuestionDetail),
-		)
-	}
-
-	return avg
+	return stats
 }
 
-func calculate_avg_failed_last_days(questions []structstypes.Question, days int) float64 {
-	if len(questions) == 0 || days <= 0 {
-		if logger != nil {
-			logger.Info("avg failed last days skipped",
-				zap.Int("total_questions", len(questions)),
-				zap.Int("days", days))
-		}
-		return 0
+func logWindowStats(ws structstypes.WindowStats, windowLabel string) {
+	if logger == nil {
+		return
 	}
 
-	now := time.Now().UTC()
-	cutoff := now.AddDate(0, 0, -days)
-	count := 0
-	considered := 0
-	var (
-		consideredIDs            []string
-		consideredDetails        []string
-		failedIDs                []string
-		notFailedIDs             []string
-		outsideWindowIDs         []string
-		outsideWindowDetails     []string
-		parseErrorQuestionIDs    []string
-		parseErrorQuestionDetail []string
+	logger.Info("calculated window stats",
+		zap.String("window", windowLabel),
+		zap.Int("days", ws.Days),
+		zap.Int("total_attempts", ws.TotalConsidered),
+		zap.Int("solved_count", ws.SolvedCount),
+		zap.Int("failed_count", ws.FailedCount),
+		zap.Float64("success_rate", ws.SuccessRate()),
+		zap.Float64("failure_rate", ws.FailureRate()),
+		zap.Strings("considered_question_ids", ws.ConsideredIDs),
+		zap.Strings("solved_question_ids", ws.SolvedIDs),
+		zap.Strings("failed_question_ids", ws.FailedIDs),
+		zap.Strings("outside_window_ids", ws.OutsideWindowIDs),
+		zap.Strings("parse_error_question_ids", ws.ParseErrorQuestionIDs),
 	)
-
-	for _, q := range questions {
-		parsed, err := parseQuestionDate(q.QuestionDate)
-		if err != nil {
-			parseErrorQuestionIDs = append(parseErrorQuestionIDs, q.QuestionID)
-			parseErrorQuestionDetail = append(parseErrorQuestionDetail, fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
-			if logger != nil {
-				logger.Warn("failed to parse question date for avg failed calculation",
-					zap.String("question_id", q.QuestionID),
-					zap.String("question_date", q.QuestionDate),
-					zap.Error(err),
-				)
-			}
-			continue
-		}
-		if parsed.After(cutoff) {
-			considered++
-			consideredIDs = append(consideredIDs, q.QuestionID)
-			consideredDetails = append(consideredDetails, fmt.Sprintf("%s:%s:%t", q.QuestionID, q.QuestionDate, q.CrackedExercise))
-			if !q.CrackedExercise {
-				count++
-				failedIDs = append(failedIDs, q.QuestionID)
-			} else {
-				notFailedIDs = append(notFailedIDs, q.QuestionID)
-			}
-		} else {
-			outsideWindowIDs = append(outsideWindowIDs, q.QuestionID)
-			outsideWindowDetails = append(outsideWindowDetails, fmt.Sprintf("%s:%s", q.QuestionID, q.QuestionDate))
-		}
-	}
-
-	avg := float64(count) / float64(days)
-	if logger != nil {
-		logger.Info("calculated avg failed last days",
-			zap.Int("days", days),
-			zap.Float64("average", avg),
-			zap.Int("failed_count", count),
-			zap.Int("considered_questions", considered),
-			zap.Time("cutoff", cutoff),
-			zap.Strings("considered_question_ids", consideredIDs),
-			zap.Strings("considered_details", consideredDetails),
-			zap.Strings("failed_question_ids", failedIDs),
-			zap.Strings("not_failed_question_ids", notFailedIDs),
-			zap.Strings("outside_window_ids", outsideWindowIDs),
-			zap.Strings("outside_window_details", outsideWindowDetails),
-			zap.Strings("parse_error_question_ids", parseErrorQuestionIDs),
-			zap.Strings("parse_error_question_details", parseErrorQuestionDetail),
-		)
-	}
-
-	return avg
 }
 
 func calculate_consistency_rate(questions []structstypes.Question) float64 {
 	if len(questions) == 0 {
-		if logger != nil {
-			logger.Info("consistency rate skipped", zap.Int("total_questions", len(questions)))
-		}
 		return 0
 	}
 
@@ -313,39 +219,15 @@ func calculate_consistency_rate(questions []structstypes.Question) float64 {
 	for _, q := range questions {
 		parsed, err := parseQuestionDate(q.QuestionDate)
 		if err != nil {
-			if logger != nil {
-				logger.Warn("failed to parse question date for consistency calculation",
-					zap.String("question_id", q.QuestionID),
-					zap.String("question_date", q.QuestionDate),
-					zap.Error(err),
-				)
-			}
 			continue
 		}
 		if parsed.After(cutoff) {
-			day := parsed.Format("2006-01-02")
-			activityDays[day] = true
+			activityDays[parsed.Format("2006-01-02")] = true
 		}
 	}
 
 	activeDays := len(activityDays)
-	rate := float64(activeDays) / 30.0
-	if logger != nil {
-		days := make([]string, 0, len(activityDays))
-		for day := range activityDays {
-			days = append(days, day)
-		}
-		sort.Strings(days)
-		logger.Info("calculated consistency rate",
-			zap.Float64("rate", rate),
-			zap.Int("active_days", activeDays),
-			zap.Time("cutoff", cutoff),
-			zap.Strings("active_day_list", days),
-			zap.Int("total_questions", len(questions)),
-		)
-	}
-
-	return rate
+	return float64(activeDays) / 30.0
 }
 
 func calculate_last_activity_days_ago(questions []structstypes.Question) int {
@@ -357,13 +239,6 @@ func calculate_last_activity_days_ago(questions []structstypes.Question) int {
 	for _, q := range questions {
 		parsed, err := parseQuestionDate(q.QuestionDate)
 		if err != nil {
-			if logger != nil {
-				logger.Warn("failed to parse question date for last activity calculation",
-					zap.String("question_id", q.QuestionID),
-					zap.String("question_date", q.QuestionDate),
-					zap.Error(err),
-				)
-			}
 			continue
 		}
 		if parsed.After(latest) {
@@ -374,6 +249,5 @@ func calculate_last_activity_days_ago(questions []structstypes.Question) int {
 	if latest.IsZero() {
 		return -1
 	}
-
 	return int(time.Since(latest).Hours() / 24)
 }
