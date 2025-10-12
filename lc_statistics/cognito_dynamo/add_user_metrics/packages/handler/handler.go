@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -74,6 +75,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 		log.Printf("Returning response: status=%d body=%s", response.StatusCode, response.Body)
 		return response, nil
 	}
+	fmt.Print("Qty of questions fetched: ", len(questions))
 
 	metrics, err := db.PutUserMetrics(ctx, userID, request, questions)
 	if err != nil {

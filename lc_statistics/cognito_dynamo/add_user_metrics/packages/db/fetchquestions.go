@@ -35,9 +35,9 @@ func FetchQuestions(ctx context.Context, userID string) ([]structstypes.Question
 			return nil, fmt.Errorf("failed to query DynamoDB: %w", err)
 		}
 
-		for _, item := range page.Items {
-			log.Printf("Raw item: %v", item)
-		}
+		//for _, item := range page.Items {
+		//	log.Printf("Raw item: %v", item)
+		//}
 
 		var pageQuestions []struct {
 			UserID          string `dynamodbav:"user_id"`

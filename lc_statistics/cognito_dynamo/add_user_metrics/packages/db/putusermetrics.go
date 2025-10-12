@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	structstypes "github.com/vitormsantana/veet-code-go/cognito_dynamo/add_user_metrics/packages/typesandstructs"
+	"go.uber.org/zap"
 )
 
 func PutUserMetrics(ctx context.Context, userID string, req structstypes.Request, questions []structstypes.Question) (*structstypes.UserMetrics, error) {
@@ -50,6 +51,20 @@ func PutUserMetrics(ctx context.Context, userID string, req structstypes.Request
 		CalculatedAtUTC:        time.Now().UTC().Format(time.RFC3339),
 	}
 
+	if logger != nil {
+		logger.Info("calculated user metrics",
+			zap.String("user_id", userID),
+			zap.Int("short_window_days", shortWindow),
+			zap.Int("long_window_days", longWindow),
+			zap.Int("total_questions", len(questions)),
+			zap.Float64("avg_solved_short", metrics.AvgSolvedLastShortDays),
+			zap.Float64("avg_solved_long", metrics.AvgSolvedLastLongDays),
+			zap.Float64("avg_failed_short", metrics.AvgFailedLastShortDays),
+			zap.Float64("avg_failed_long", metrics.AvgFailedLastLongDays),
+			zap.Float64("consistency_rate", metrics.ConsistencyRate),
+		)
+	}
+
 	item, err := attributevalue.MarshalMap(metrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metrics: %w", err)
@@ -62,6 +77,14 @@ func PutUserMetrics(ctx context.Context, userID string, req structstypes.Request
 
 	if _, err := Client.PutItem(ctx, input); err != nil {
 		return nil, fmt.Errorf("failed to store metrics: %w", err)
+	}
+
+	if logger != nil {
+		logger.Info("stored user metrics in dynamodb",
+			zap.String("user_id", userID),
+			zap.String("metrics_date", metrics.Date),
+			zap.String("calculated_at", metrics.CalculatedAtUTC),
+		)
 	}
 
 	return metrics, nil
