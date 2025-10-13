@@ -1,0 +1,45 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_question_to_dynamo/packages/db"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_question_to_dynamo/packages/handler"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_question_to_dynamo/packages/typesandstructs"
+)
+
+func main() {
+	db.Init()
+
+	payload := typesandstructs.Request{
+		QuestionName:       "Two Sum",
+		QuestionDate:       time.Now().Format("2006-01-02"),
+		QuestionDifficulty: "Easy",
+		QuestionTags:       []string{"Array", "HashMap"},
+		MinutesTaken:       20,
+		NeededHelp:         false,
+	}
+
+	body, _ := json.Marshal(payload)
+
+	event := events.APIGatewayProxyRequest{
+		Body: string(body),
+		Headers: map[string]string{
+			"Authorization": "Bearer dummy-sub-token",
+		},
+	}
+
+	resp, err := handler.Handler(context.Background(), event)
+	if err != nil {
+		fmt.Println("Handler: erro:", err)
+		return
+	}
+
+	respJSON, _ := json.MarshalIndent(resp, "", "  ")
+	fmt.Println("Resposta da Lambda:")
+	fmt.Println(string(respJSON))
+}

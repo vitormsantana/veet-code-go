@@ -1,6 +1,7 @@
 package structstypes
 
 type UserMetrics struct {
+	MetricID                      string             `json:"metric_id" dynamodbav:"metric_id"`
 	UserID                        string             `json:"user_id" dynamodbav:"user_id"`
 	Date                          string             `json:"date" dynamodbav:"date"`
 	ShortWindowDays               int                `json:"short_window_days" dynamodbav:"short_window_days"`

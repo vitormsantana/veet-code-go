@@ -196,7 +196,11 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 		log.Printf("Stored recommendation with id %s", recommendationRecord.RecommendationID)
 	}
 
-	responsePayload, err := json.Marshal(map[string]string{"suggestions": suggestions})
+	responsePayload, err := json.Marshal(map[string]string{
+		"suggestions":       suggestions,
+		"recommendation_id": recommendationRecord.RecommendationID,
+		"metric_id":         recommendationRecord.MetricsID,
+	})
 	if err != nil {
 		log.Printf("Failed to marshal response: %v", err)
 		response := events.APIGatewayProxyResponse{
