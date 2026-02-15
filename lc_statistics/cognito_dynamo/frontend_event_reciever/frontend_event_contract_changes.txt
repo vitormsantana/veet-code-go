@@ -1,0 +1,66 @@
+Frontend Event Contract Changes (Backend)
+Date: 2026-02-15
+
+Context
+- We introduced a clearer split between UI interaction events and API execution events.
+- Backend now validates event semantics to avoid mixing meanings in one event.
+
+What changed
+1) New event type added
+- eventType now accepts:
+  - page_access
+  - button_click
+  - api_call
+
+2) API payload rules
+- eventType=api_call:
+  - api object is REQUIRED
+- eventType=button_click:
+  - api object is NOT allowed
+- eventType=page_access:
+  - api object is currently accepted as migration compatibility
+  - target state: page_access should not carry api, api should move to api_call
+
+3) Storage changes
+- S3 partition path changed to:
+  - analytics-events/anomesdia=YYYYMMDD/app=<app>/eventType=<eventType>/<eventId>.json
+- raw payload copy was removed from stored JSON
+  - only flattened fields are persisted
+
+4) CORS fix
+- Wildcard allowlist (`ALLOWED_ORIGINS=*`) now works correctly.
+
+Why frontend still errors in your scenario
+- You reported frontend sends button_click when page is loaded.
+- If that payload includes api, backend returns:
+  - "api object is allowed only when eventType is api_call"
+
+Required frontend behavior (final desired model)
+1) On page load
+- Send page_access event (no api preferred)
+- If page load triggers backend request, also send a separate api_call event with api object
+
+2) On button click (always)
+- Send button_click event WITHOUT api object
+
+3) If button click triggers API request
+- Send second event: api_call WITH api object
+
+Practical mapping
+- button_click = UI intent/action happened
+- api_call = backend request happened
+- page_access = page entry/navigation happened
+
+Temporary compatibility currently enabled
+- page_access + api is accepted to avoid breaking migration.
+- button_click + api remains rejected by design.
+
+Example valid sequence: user opens page and clicks "Load"
+1) page_access (no api)
+2) api_call (name=/endpoint/method/status/outcome)
+3) button_click (button metadata, no api)
+4) api_call (if click caused another API call)
+
+Next frontend fix to implement
+- Stop sending button_click on page load.
+- Ensure any event with api object uses eventType=api_call.

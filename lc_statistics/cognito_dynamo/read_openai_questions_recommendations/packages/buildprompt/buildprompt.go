@@ -7,7 +7,14 @@ import (
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_openai_questions_recommendations/packages/structstypes"
 )
 
-func BuildPrompt(goal string, questionNames []string, stats structstypes.Statistics, profile *structstypes.UserProfile, metrics *structstypes.UserMetrics) (string, error) {
+func BuildPrompt(
+	goal string,
+	questionNames []string,
+	stats structstypes.Statistics,
+	profile *structstypes.UserProfile,
+	metrics *structstypes.UserMetrics,
+	feedbackContext string,
+) (string, error) {
 	type promptStats struct {
 		QuestionsCrackedPerDay            map[string]int              `json:"questionsCrackedPerDay"`
 		QuestionsCrackedPerDifficulty     map[string]int              `json:"questionsCrackedPerDifficulty"`
@@ -52,6 +59,7 @@ User's goal: "%s".
 User's profile (consider this context): %s
 User's exercise performance metrics: %s
 User's historical stats (per day, difficulty, tag): %s
+Recent feedback trends from previous recommendations: %s
 
 You are an AI interview preparation coach.
 Your job is to analyze the user's behavior, pace, and consistency to create an adaptive learning plan.
@@ -112,6 +120,7 @@ Main topics reference:
 		string(profileJSON),
 		string(metricsJSON),
 		string(statsJSON),
+		feedbackContext,
 		string(namesJSON),
 	)
 

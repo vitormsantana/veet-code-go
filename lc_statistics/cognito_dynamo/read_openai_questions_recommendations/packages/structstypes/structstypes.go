@@ -99,3 +99,37 @@ type RecommendationMetadata struct {
 	DifficultyBand  []string `json:"difficulty_band" dynamodbav:"difficulty_band"`
 	UserStatus      string   `json:"user_status" dynamodbav:"user_status"`
 }
+
+type Feedback struct {
+	FeedbackID        string `json:"feedback_id" dynamodbav:"feedback_id"`
+	FeedbackTimestamp string `json:"feedback_timestamp" dynamodbav:"feedback_timestamp"`
+	FeedbackValue     int    `json:"feedback_value" dynamodbav:"feedback_value"`
+	FeedbackComment   string `json:"feedback_comment,omitempty" dynamodbav:"feedback_comment,omitempty"`
+	RecomendationID   string `json:"recomendation_id" dynamodbav:"recomendation_id"`
+	UserID            string `json:"user_id" dynamodbav:"user_id"`
+}
+
+type ProcessedFeedbackSummary struct {
+	SummaryID          string                   `json:"summary_id" dynamodbav:"summary_id"`
+	UserID             string                   `json:"user_id" dynamodbav:"user_id"`
+	GeneratedAtUTC     string                   `json:"generated_at_utc" dynamodbav:"generated_at_utc"`
+	AnalyzedAtUTC      string                   `json:"analyzed_at_utc" dynamodbav:"analyzed_at_utc"`
+	FeedbackCount      int                      `json:"feedback_count" dynamodbav:"feedback_count"`
+	FeedbackIDs        []string                 `json:"feedback_ids,omitempty" dynamodbav:"feedback_ids,omitempty"`
+	RecommendationIDs  []string                 `json:"recommendation_ids,omitempty" dynamodbav:"recommendation_ids,omitempty"`
+	PromptUsed         string                   `json:"prompt_used" dynamodbav:"prompt_used"`
+	ModelUsed          string                   `json:"model_used" dynamodbav:"model_used"`
+	SummaryText        string                   `json:"summary_text" dynamodbav:"summary_text"`
+	StructuredSummary  ProcessedFeedbackDetails `json:"structured_summary" dynamodbav:"structured_summary"`
+	RawModelResponse   string                   `json:"raw_model_response,omitempty" dynamodbav:"raw_model_response,omitempty"`
+	AdditionalMetadata map[string]string        `json:"additional_metadata,omitempty" dynamodbav:"additional_metadata,omitempty"`
+}
+
+type ProcessedFeedbackDetails struct {
+	Narrative       string   `json:"narrative" dynamodbav:"narrative"`
+	PriorityTopics  []string `json:"priority_topics,omitempty" dynamodbav:"priority_topics,omitempty"`
+	AvoidTopics     []string `json:"avoid_topics,omitempty" dynamodbav:"avoid_topics,omitempty"`
+	ToneGuidance    []string `json:"tone_guidance,omitempty" dynamodbav:"tone_guidance,omitempty"`
+	CoachingActions []string `json:"coaching_actions,omitempty" dynamodbav:"coaching_actions,omitempty"`
+	Confidence      string   `json:"confidence,omitempty" dynamodbav:"confidence,omitempty"`
+}

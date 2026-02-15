@@ -23,6 +23,7 @@ const (
 	metricsTableName         = "hammocker_user_metrics_table"
 	profileTableName         = "hammocker_user_profiles_table"
 	recommendationsTableName = "hammocker_recommendations_table"
+	feedbackSummaryTableName = "hammocker_last_feedback_summaries_table"
 )
 
 func init() {
@@ -208,4 +209,32 @@ func SaveRecommendation(ctx context.Context, rec *structstypes.RecommendationRec
 	}
 
 	return nil
+}
+
+func FetchLatestFeedbackSummary(ctx context.Context, userID string) (*structstypes.ProcessedFeedbackSummary, error) {
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(feedbackSummaryTableName),
+		KeyConditionExpression: aws.String("user_id = :uid"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid": &types.AttributeValueMemberS{Value: userID},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(1),
+	}
+
+	result, err := dynamoClient.Query(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query feedback summaries: %w", err)
+	}
+
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+
+	var summary structstypes.ProcessedFeedbackSummary
+	if err := attributevalue.UnmarshalMap(result.Items[0], &summary); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal feedback summary: %w", err)
+	}
+
+	return &summary, nil
 }

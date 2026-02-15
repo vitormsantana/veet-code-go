@@ -1,0 +1,106 @@
+You are implementing a new AWS backend for event ingestion from a frontend app.
+
+Goal
+- Build a Go Lambda + API Gateway endpoint to receive analytics events and persist them for QuickSight analysis.
+- Frontend already sends events; backend must match the contract below.
+
+Context
+- Frontend app: Angular web app.
+- Ingestion endpoint will be configured in frontend env as:
+  - analyticsEventsApiUrl
+- Requests are JSON over HTTP POST.
+- CORS is required for browser requests.
+
+Event Contract (must accept)
+- Single event per request body.
+
+JSON shape:
+{
+  "eventId": "uuid-or-generated-id",
+  "timestamp": "2026-02-15T12:34:56.000Z",
+  "app": "veet-app-web",
+  "eventType": "page_access | button_click",
+  "phase": "start | response",
+  "source": "page_load | user_click",
+  "feature": "questions",
+  "page": "/current/url/path?query=1#hash",
+  "label": "optional readable label",
+  "api": {
+    "name": "optional api action name",
+    "endpoint": "/optional_endpoint",
+    "method": "GET | POST | PUT | DELETE",
+    "statusCode": 200,
+    "outcome": "success | error"
+  },
+  "user": {
+    "sub": "optional-cognito-sub",
+    "email": "optional-user-email"
+  },
+  "metadata": {
+    "buttonId": "optional",
+    "buttonClasses": "optional"
+  }
+}
+
+Validation Rules
+- Required fields:
+  - eventId, timestamp, app, eventType, phase, source, feature, page
+- enum constraints:
+  - eventType in [page_access, button_click]
+  - phase in [start, response]
+  - source in [page_load, user_click]
+- If api object is present:
+  - api.name, api.endpoint, api.method required
+  - api.statusCode optional integer
+  - api.outcome optional enum [success, error]
+- Reject invalid payload with HTTP 400 and clear error message.
+
+API Behavior
+- Endpoint: POST /analytics/events (or equivalent)
+- Response on success: HTTP 202 (or 200) with JSON ack containing eventId.
+- Must be idempotent-friendly (eventId can be used as dedupe key).
+- Implement CORS preflight and response headers.
+
+Storage Requirements (QuickSight friendly)
+- Persist one record per event.
+- Include ingestion timestamp in addition to event timestamp.
+- Keep fields queryable as dimensions:
+  - event timestamp, ingestion timestamp, app, eventType, phase, source, feature, page, label,
+  - api.name, api.endpoint, api.method, api.statusCode, api.outcome,
+  - user.sub, user.email
+- Choose a practical AWS storage target and explain tradeoffs:
+  - Preferred: S3 (partitioned by date) + Athena/Glue for QuickSight
+  - Alternative: DynamoDB + periodic export
+
+Security
+- For now allow unauthenticated ingestion from allowed origins (CORS allowlist).
+- Add clear extension point to enable Cognito JWT validation later.
+
+Observability
+- Structured logs in JSON.
+- Log validation errors with reason.
+- Include requestId and eventId in logs.
+- Emit CloudWatch metrics (count success/failure).
+
+Deliverables
+1) Go Lambda source code (handler, validation, storage adapter)
+2) IaC (SAM or Terraform) to deploy:
+   - Lambda
+   - API Gateway route
+   - IAM permissions
+   - storage resources
+3) README with deploy steps and how to test using curl
+4) Sample curl requests (valid + invalid)
+5) Notes on QuickSight setup path
+
+Non-Goals
+- No frontend changes
+- No dashboard creation now
+
+Acceptance Criteria
+- Valid event returns 2xx and is persisted.
+- Invalid event returns 400 with specific validation error.
+- CORS works from localhost frontend.
+- At least one query path for QuickSight is documented and testable.
+
+Please generate production-quality code with clear structure, minimal dependencies, and explicit error handling.

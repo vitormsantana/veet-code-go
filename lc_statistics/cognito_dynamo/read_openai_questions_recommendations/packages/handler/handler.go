@@ -139,7 +139,28 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 		return response, nil
 	}
 
-	prompt, err := buildprompt.BuildPrompt(goal, questionNames, stats, profile, metrics)
+	var feedbackContext string
+	var feedbackSummary *structstypes.ProcessedFeedbackSummary
+
+	feedbackSummary, err = db.FetchLatestFeedbackSummary(ctx, userID)
+	if err != nil {
+		log.Printf("Failed to fetch processed feedback summary: %v", err)
+	}
+
+	if feedbackSummary != nil {
+		feedbackContext = buildprompt.FormatProcessedFeedbackSummary(feedbackSummary)
+	} else {
+		combinedFeedbacksRecomendations, err := buildprompt.GetRecentFeedbacksWithRecommendations(ctx, userID, 12)
+		if err != nil {
+			log.Printf("Failed to fetch feedback context: %v", err)
+			combinedFeedbacksRecomendations = nil
+		}
+		feedbackContext = buildprompt.SummarizeFeedbackContext(combinedFeedbacksRecomendations)
+	}
+
+	log.Printf("Feedback context used:\n%s", feedbackContext)
+
+	prompt, err := buildprompt.BuildPrompt(goal, questionNames, stats, profile, metrics, feedbackContext)
 	if err != nil {
 		log.Printf("Failed to build prompt: %v", err)
 		response := events.APIGatewayProxyResponse{
@@ -183,7 +204,7 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 			Intro:           introText,
 			Recommendations: recItems,
 		},
-		Metadata:         buildRecommendationMetadata(metrics, recItems),
+		Metadata:         buildRecommendationMetadata(metrics, feedbackSummary, recItems),
 		MetricsID:        metricsID(metrics),
 		PreviouslySolved: append([]string(nil), questionNames...),
 		ProfileSnapshot:  profile,
@@ -523,10 +544,20 @@ func metricsID(metrics *structstypes.UserMetrics) string {
 	return metrics.MetricID
 }
 
-func buildRecommendationMetadata(metrics *structstypes.UserMetrics, items []structstypes.RecommendationItem) structstypes.RecommendationMetadata {
+func buildRecommendationMetadata(metrics *structstypes.UserMetrics, summary *structstypes.ProcessedFeedbackSummary, items []structstypes.RecommendationItem) structstypes.RecommendationMetadata {
 	focusTagSet := make(map[string]struct{})
 	for _, item := range items {
 		if tag := strings.TrimSpace(item.Category); tag != "" {
+			focusTagSet[tag] = struct{}{}
+		}
+	}
+
+	if summary != nil {
+		for _, tag := range summary.StructuredSummary.PriorityTopics {
+			tag = strings.TrimSpace(tag)
+			if tag == "" {
+				continue
+			}
 			focusTagSet[tag] = struct{}{}
 		}
 	}
@@ -542,7 +573,7 @@ func buildRecommendationMetadata(metrics *structstypes.UserMetrics, items []stru
 	metadata := structstypes.RecommendationMetadata{
 		FocusTags:       focusTags,
 		ConfidenceLevel: deriveConfidenceLevel(metrics),
-		Tone:            "Motivational",
+		Tone:            deriveTonePreference(summary),
 		DifficultyBand:  deriveDifficultyBand(metrics),
 		UserStatus:      deriveUserStatus(metrics),
 	}
@@ -570,6 +601,31 @@ func deriveConfidenceLevel(metrics *structstypes.UserMetrics) string {
 	}
 
 	return "Low"
+}
+
+func deriveTonePreference(summary *structstypes.ProcessedFeedbackSummary) string {
+	if summary == nil || len(summary.StructuredSummary.ToneGuidance) == 0 {
+		return "Motivational"
+	}
+
+	suggestions := make([]string, 0, len(summary.StructuredSummary.ToneGuidance))
+	for _, tone := range summary.StructuredSummary.ToneGuidance {
+		tone = strings.TrimSpace(tone)
+		if tone == "" {
+			continue
+		}
+		suggestions = append(suggestions, strings.Title(tone))
+	}
+
+	if len(suggestions) == 0 {
+		return "Motivational"
+	}
+
+	if len(suggestions) == 1 {
+		return suggestions[0]
+	}
+
+	return strings.Join(suggestions, ", ")
 }
 
 func deriveDifficultyBand(metrics *structstypes.UserMetrics) []string {

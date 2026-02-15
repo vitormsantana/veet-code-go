@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_feedback_for_recomendation/packages/auth"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_feedback_for_recomendation/packages/db"
 	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_feedback_for_recomendation/packages/typesandstructs"
+	"github.com/vitormsantana/veet-code-go/cognito_dynamo/add_feedback_for_recomendation/packages/feedbacksummary"
 )
 
 func init() {
@@ -84,6 +86,8 @@ func Handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 		return response, nil
 	}
 
+	processLatestFeedbackSummary(ctx, userID)
+
 	confirmation := fmt.Sprintf("Feedback recorded for recommendation %s.", request.RecomendationID)
 
 	responseBody, err := json.Marshal(map[string]string{"message": confirmation})
@@ -139,4 +143,18 @@ func validateFeedback(f typesandstructs.Feedback) error {
 	}
 
 	return nil
+}
+
+func processLatestFeedbackSummary(ctx context.Context, userID string) {
+	summary, err := feedbacksummary.ProcessUserFeedback(ctx, userID, 5)
+	if err != nil {
+		if errors.Is(err, feedbacksummary.ErrNoFeedback) {
+			log.Printf("Processed feedback summary skipped for user %s: %v", userID, err)
+			return
+		}
+		log.Printf("Failed to generate processed feedback summary for user %s: %v", userID, err)
+		return
+	}
+
+	log.Printf("Processed feedback summary %s generated for user %s using %d feedbacks", summary.SummaryID, userID, summary.FeedbackCount)
 }
