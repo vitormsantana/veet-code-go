@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/vitormsantana/veet-code-go/cognito_dynamo/read_exercises_from_dynamo/packages/structstypes"
+	"github.com/vitormsantana/veet-code-go/lc_statistics/cognito_dynamo/read_metrics_from_users/packages/structstypes"
 )
 
 var dynamoClient *dynamodb.Client
