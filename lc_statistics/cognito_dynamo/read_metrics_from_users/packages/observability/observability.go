@@ -56,19 +56,41 @@ func New(ctx context.Context, req events.APIGatewayProxyRequest, service string)
 	if strings.TrimSpace(service) == "" {
 		service = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
 	}
+	correlationID := firstNonEmpty(
+		headerValue(req.Headers, "x-correlation-id"),
+		req.RequestContext.RequestID,
+		newTraceID(),
+	)
+	env := firstNonEmpty(
+		headerValue(req.Headers, "x-env"),
+		strings.TrimSpace(os.Getenv("APP_ENV")),
+		"dev",
+	)
+	appVersion := firstNonEmpty(
+		headerValue(req.Headers, "x-app-version"),
+		strings.TrimSpace(os.Getenv("APP_VERSION")),
+		"unknown",
+	)
 
 	base := map[string]interface{}{
-		"service":      service,
-		"function":     os.Getenv("AWS_LAMBDA_FUNCTION_NAME"),
-		"awsRequestId": awsRequestID(ctx),
-		"requestId":    req.RequestContext.RequestID,
-		"traceId":      traceRootID(),
-		"path":         req.Path,
-		"resource":     req.Resource,
-		"method":       req.HTTPMethod,
+		"service":        service,
+		"function":       os.Getenv("AWS_LAMBDA_FUNCTION_NAME"),
+		"awsRequestId":   awsRequestID(ctx),
+		"requestId":      req.RequestContext.RequestID,
+		"traceId":        traceRootID(),
+		"path":           req.Path,
+		"resource":       req.Resource,
+		"method":         req.HTTPMethod,
+		"correlation_id": correlationID,
+		"env":            env,
+		"app_version":    appVersion,
 	}
 
 	return &Obs{service: service, base: base}
+}
+
+func (o *Obs) CorrelationID() string {
+	return asString(o.base["correlation_id"])
 }
 
 func (o *Obs) Info(message string, fields map[string]interface{})  { o.log("info", message, fields) }
@@ -310,6 +332,29 @@ func traceRootID() string {
 func asString(v interface{}) string {
 	s, _ := v.(string)
 	return s
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func headerValue(headers map[string]string, name string) string {
+	if len(headers) == 0 {
+		return ""
+	}
+	lower := strings.ToLower(strings.TrimSpace(name))
+	for k, v := range headers {
+		if strings.ToLower(strings.TrimSpace(k)) == lower {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 func newTraceID() string {
